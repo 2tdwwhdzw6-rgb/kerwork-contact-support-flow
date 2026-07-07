@@ -321,10 +321,9 @@
     }
 
     .error-card.success {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity .18s ease, visibility .18s ease;
+      color: #1f7f47;
+      background: #effaf3;
+      border-color: #bde8ca;
     }
 
     .error-icon {
@@ -395,6 +394,10 @@
       display: flex;
       gap: 10px;
       padding-top: 2px;
+    }
+
+    .error-actions.is-hidden {
+      display: none;
     }
 
     .btn {
@@ -1029,6 +1032,7 @@
     const errorIcon = document.getElementById('errorIcon');
     const errorTitle = document.getElementById('errorTitle');
     const errorMeta = document.getElementById('errorMeta');
+    const errorActions = document.querySelector('.error-actions');
     const retryButton = document.getElementById('retryButton');
     const supportButton = document.getElementById('supportButton');
     const resentUserMessage = document.getElementById('resentUserMessage');
@@ -1058,6 +1062,10 @@
       retryButton.textContent = disabled ? '重试中' : '重试';
     }
 
+    function setActionsVisible(visible) {
+      errorActions.classList.toggle('is-hidden', !visible);
+    }
+
     function showRetryMessages() {
       resentUserMessage.classList.add('show');
       retryAssistantMessage.classList.add('show');
@@ -1073,6 +1081,7 @@
       retryToolPill.innerHTML = toolHtml.retrying;
       resentUserMessage.classList.remove('show');
       retryAssistantMessage.classList.remove('show');
+      setActionsVisible(true);
       setActionDisabled(false);
       setDemoActive('initial');
     }
@@ -1086,6 +1095,7 @@
       retryAssistantText.textContent = '我再试一次。';
       retryToolPill.innerHTML = toolHtml.retrying;
       showRetryMessages();
+      setActionsVisible(false);
       setActionDisabled(true);
       setDemoActive('retrying');
       if (scrollToMessage) {
@@ -1096,11 +1106,13 @@
     function setRetrySuccess() {
       errorCard.classList.remove('retrying');
       errorCard.classList.add('success');
-      errorTitle.textContent = '已重新发送';
+      errorIcon.textContent = '';
+      errorTitle.textContent = '已重试成功';
       errorMeta.textContent = '请求已恢复处理';
       retryAssistantText.textContent = '已重新处理完成。';
       retryToolPill.innerHTML = toolHtml.success;
       showRetryMessages();
+      setActionsVisible(false);
       setActionDisabled(false);
       setDemoActive('success');
     }
@@ -1113,6 +1125,7 @@
       retryAssistantText.textContent = '还是没有成功，可以再重试一次，或联系客服处理。';
       retryToolPill.innerHTML = toolHtml.failure;
       showRetryMessages();
+      setActionsVisible(true);
       setActionDisabled(false);
       setDemoActive('failure');
     }
