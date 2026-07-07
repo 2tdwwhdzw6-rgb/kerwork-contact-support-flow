@@ -266,6 +266,18 @@
       line-height: 1.55;
     }
 
+    .error-card.retrying {
+      color: #4f5969;
+      background: #f3f6fa;
+      border-color: #d9dee8;
+    }
+
+    .error-card.success {
+      color: #237a48;
+      background: #edf8f1;
+      border-color: #c9ecd5;
+    }
+
     .error-icon {
       width: 26px;
       height: 26px;
@@ -277,6 +289,35 @@
       font-size: 17px;
       font-weight: 800;
       margin-top: 2px;
+    }
+
+    .error-card.retrying .error-icon {
+      border-color: transparent;
+      border-top-color: currentColor;
+      animation: spin .8s linear infinite;
+      color: #6a7280;
+      font-size: 0;
+    }
+
+    .error-card.success .error-icon {
+      border-color: currentColor;
+      font-size: 0;
+    }
+
+    .error-card.success .error-icon::after {
+      content: "";
+      width: 10px;
+      height: 6px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(-45deg);
+      margin-top: -2px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
     }
 
     .error-content {
@@ -294,6 +335,11 @@
       font-size: 16px;
       color: rgba(201, 83, 99, .72);
       word-break: break-all;
+    }
+
+    .error-card.retrying .error-meta,
+    .error-card.success .error-meta {
+      color: #737b89;
     }
 
     .error-actions {
@@ -328,6 +374,12 @@
 
     .btn-primary:hover {
       background: #30343d;
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: .62;
+      transform: none;
     }
 
     .btn-secondary {
@@ -732,21 +784,21 @@
         <div class="message">
           <p class="assistant-text">将删除 113 个会话目录（保留当前会话 <code>`session-1783059188666-0`</code>）。</p>
           <div class="error-flow">
-            <div class="error-card" role="alert">
-              <div class="error-icon">!</div>
+            <div id="errorCard" class="error-card" role="alert">
+              <div id="errorIcon" class="error-icon">!</div>
               <div class="error-content">
-                <div class="error-title">当前请求失败，如多次失败可联系客服协助处理</div>
-                <div class="error-meta">request id: 2026070609200461331629duF5MwaE · ERR_20244</div>
+                <div id="errorTitle" class="error-title">当前请求失败，请重试。若仍无法解决，请联系客服处理。</div>
+                <div id="errorMeta" class="error-meta">request id: 2026070609200461331629duF5MwaE · ERR_20244</div>
               </div>
             </div>
             <div class="error-actions">
-              <button class="btn btn-secondary js-support">
+              <button id="retryButton" class="btn btn-primary js-retry">重试</button>
+              <button id="supportButton" class="btn btn-secondary js-support">
                 <svg class="inline-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M5 18.5V19l3.2-1.7c1.1.5 2.4.7 3.8.7 4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6c0 1.6.8 3 2.1 4.1L5 18.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
                 </svg>
                 联系客服
               </button>
-              <button class="btn btn-primary js-retry">重试</button>
             </div>
           </div>
           <div id="status" class="status-line" aria-live="polite"></div>
@@ -848,7 +900,14 @@
     const overlay = document.getElementById('supportOverlay');
     const toast = document.getElementById('toast');
     const status = document.getElementById('status');
+    const errorCard = document.getElementById('errorCard');
+    const errorIcon = document.getElementById('errorIcon');
+    const errorTitle = document.getElementById('errorTitle');
+    const errorMeta = document.getElementById('errorMeta');
+    const retryButton = document.getElementById('retryButton');
+    const supportButton = document.getElementById('supportButton');
     const wechatId = document.getElementById('wechatId').textContent.trim();
+    let retryCount = 0;
 
     function openSupport() {
       overlay.classList.add('show');
@@ -915,9 +974,42 @@
 
     document.querySelectorAll('.js-retry').forEach((button) => {
       button.addEventListener('click', () => {
-        status.textContent = '已重新发送当前消息，系统会再次尝试处理该请求。若仍失败，可通过客服入口联系支持。';
+        retryCount += 1;
+        errorCard.classList.remove('success');
+        errorCard.classList.add('retrying');
+        errorIcon.textContent = '';
+        errorTitle.textContent = '正在重新发送';
+        errorMeta.textContent = '系统正在重新发送上一条完整消息，包含原始文本、图片、文件和上下文参数。';
+        retryButton.disabled = true;
+        supportButton.disabled = true;
+        retryButton.textContent = '重试中';
+        status.textContent = '已重新发送上一条完整 query。原红色错误提示已切换为重试中状态。';
         status.classList.add('show');
-        showToast('已重新发送');
+        showToast('正在重新发送');
+
+        window.clearTimeout(window.retryTimer);
+        window.retryTimer = window.setTimeout(() => {
+          const shouldSucceed = retryCount % 2 === 1;
+          retryButton.disabled = false;
+          supportButton.disabled = false;
+          retryButton.textContent = '重试';
+
+          if (shouldSucceed) {
+            errorCard.classList.remove('retrying');
+            errorCard.classList.add('success');
+            errorTitle.textContent = '已重新发送成功';
+            errorMeta.textContent = '错误提示已消失，页面继续展示正常回复结果。';
+            status.textContent = '模拟结果：本次重试成功。实际产品中应隐藏错误卡片，并展示新的正常回复。再次点击「重试」可预览失败后的状态。';
+            showToast('重试成功');
+          } else {
+            errorCard.classList.remove('retrying', 'success');
+            errorIcon.textContent = '!';
+            errorTitle.textContent = '当前请求仍失败，请重试或联系客服处理';
+            errorMeta.textContent = 'request id: 20260706092411823765009xRetry · ERR_20244';
+            status.textContent = '模拟结果：本次重试失败。系统展示新的错误提示，并更新 request id 和错误信息。';
+            showToast('重试失败');
+          }
+        }, 1300);
       });
     });
 
