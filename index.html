@@ -208,6 +208,50 @@
       margin: 0 auto 34px;
     }
 
+    .message.user {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .user-bubble {
+      max-width: min(720px, 78%);
+      border-radius: 18px;
+      background: #eceff5;
+      color: #252a33;
+      padding: 18px 22px;
+      font-size: 23px;
+      line-height: 1.55;
+      font-weight: 520;
+    }
+
+    .user-attachments {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .attachment-chip {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .74);
+      color: #697283;
+      padding: 0 10px;
+      font-size: 15px;
+    }
+
+    .retry-message {
+      max-width: 1120px;
+      margin: 0 auto 34px;
+      display: none;
+    }
+
+    .retry-message.show {
+      display: block;
+    }
+
     .assistant-text {
       margin: 0 0 28px;
       color: #4c5668;
@@ -418,6 +462,10 @@
 
     .status-line.show {
       display: block;
+    }
+
+    .status-line {
+      display: none !important;
     }
 
     .feedback {
@@ -804,6 +852,27 @@
           <div id="status" class="status-line" aria-live="polite"></div>
         </div>
 
+        <div id="resentUserMessage" class="message user retry-message" aria-live="polite">
+          <div class="user-bubble">
+            清空所有会话
+            <div class="user-attachments">
+              <span class="attachment-chip">原始 query</span>
+              <span class="attachment-chip">保留上下文参数</span>
+              <span class="attachment-chip">保留图片 / 文件</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="retryAssistantMessage" class="message retry-message" aria-live="polite">
+          <p id="retryAssistantText" class="assistant-text">正在重新发送上一条完整消息。</p>
+          <div id="retryToolPill" class="tool-pill">
+            <span>▻_</span>
+            <span class="tool-title">重试中</span>
+            <span class="tool-path">重新提交原始 query、附件和上下文参数...</span>
+            <span>⌄</span>
+          </div>
+        </div>
+
         <div class="message">
           <div class="tool-pill">
             <span>▻_</span>
@@ -906,6 +975,10 @@
     const errorMeta = document.getElementById('errorMeta');
     const retryButton = document.getElementById('retryButton');
     const supportButton = document.getElementById('supportButton');
+    const resentUserMessage = document.getElementById('resentUserMessage');
+    const retryAssistantMessage = document.getElementById('retryAssistantMessage');
+    const retryAssistantText = document.getElementById('retryAssistantText');
+    const retryToolPill = document.getElementById('retryToolPill');
     const wechatId = document.getElementById('wechatId').textContent.trim();
     let retryCount = 0;
 
@@ -983,8 +1056,11 @@
         retryButton.disabled = true;
         supportButton.disabled = true;
         retryButton.textContent = '重试中';
-        status.textContent = '已重新发送上一条完整 query。原红色错误提示已切换为重试中状态。';
-        status.classList.add('show');
+        resentUserMessage.classList.add('show');
+        retryAssistantMessage.classList.add('show');
+        retryAssistantText.textContent = '正在重新发送上一条完整消息。';
+        retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">重试中</span><span class="tool-path">重新提交原始 query、附件和上下文参数...</span><span>⌄</span>';
+        resentUserMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
         showToast('正在重新发送');
 
         window.clearTimeout(window.retryTimer);
@@ -998,15 +1074,17 @@
             errorCard.classList.remove('retrying');
             errorCard.classList.add('success');
             errorTitle.textContent = '已重新发送成功';
-            errorMeta.textContent = '错误提示已消失，页面继续展示正常回复结果。';
-            status.textContent = '模拟结果：本次重试成功。实际产品中应隐藏错误卡片，并展示新的正常回复。再次点击「重试」可预览失败后的状态。';
+            errorMeta.textContent = '实际产品中，此错误提示会消失。此处保留成功态用于展示交互结果。';
+            retryAssistantText.textContent = '已重新发送并完成处理。';
+            retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">步骤*4</span><span class="tool-path">已重新执行上一条完整请求</span><span>⌄</span>';
             showToast('重试成功');
           } else {
             errorCard.classList.remove('retrying', 'success');
             errorIcon.textContent = '!';
             errorTitle.textContent = '当前请求仍失败，请重试或联系客服处理';
             errorMeta.textContent = 'request id: 20260706092411823765009xRetry · ERR_20244';
-            status.textContent = '模拟结果：本次重试失败。系统展示新的错误提示，并更新 request id 和错误信息。';
+            retryAssistantText.textContent = '重新发送后仍未成功，已展示新的错误提示。';
+            retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">重试失败</span><span class="tool-path">已更新 request id 和错误信息</span><span>⌄</span>';
             showToast('重试失败');
           }
         }, 1300);
