@@ -131,6 +131,10 @@
       color: var(--text);
     }
 
+    .conversation-item.is-hidden {
+      display: none;
+    }
+
     .account {
       height: 68px;
       display: flex;
@@ -400,6 +404,20 @@
       display: none;
     }
 
+    .btn-create {
+      background: var(--brand);
+      color: #fff;
+      font-size: 22px;
+    }
+
+    .btn-create:hover {
+      background: #30343d;
+    }
+
+    .btn.is-hidden {
+      display: none;
+    }
+
     .btn {
       min-height: 54px;
       border-radius: 16px;
@@ -589,6 +607,12 @@
     .demo-controls button.active {
       background: #171a1f;
       color: #fff;
+    }
+
+    .session-created {
+      color: #1f7f47;
+      background: #effaf3;
+      border-color: #bde8ca;
     }
 
     .overlay {
@@ -830,6 +854,7 @@
         </div>
         <div class="conversation-list">
           <div class="conversation-item active">清空所有会话</div>
+          <div id="newConversationItem" class="conversation-item is-hidden">清空所有会话（新会话）</div>
           <div class="conversation-item">Manus分析报告撰写</div>
           <div class="conversation-item">心理学知识学习App...</div>
           <div class="conversation-item">上月工作总结撰写</div>
@@ -861,7 +886,7 @@
           <path d="M8 10c0-4 3-6 7-5l13 2c3 1 5 3 5 6v9c0 4-3 6-7 5l-4-.8 7 8-2 1-10-10-2-.3c-4-.7-7-3-7-7V10Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
           <path d="M17 14h.1M25 15h.1" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
         </svg>
-        <h1 class="task-title">清空所有会话</h1>
+        <h1 id="taskTitle" class="task-title">清空所有会话</h1>
       </header>
 
       <section class="chat" aria-label="任务消息流">
@@ -897,6 +922,7 @@
             </div>
             <div class="error-actions">
               <button id="retryButton" class="btn btn-primary js-retry">重试</button>
+              <button id="createSessionButton" class="btn btn-create is-hidden">创建新会话</button>
               <button id="supportButton" class="btn btn-secondary js-support">
                 <svg class="inline-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M5 18.5V19l3.2-1.7c1.1.5 2.4.7 3.8.7 4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6c0 1.6.8 3 2.1 4.1L5 18.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -909,7 +935,7 @@
         </div>
 
         <div id="resentUserMessage" class="message user retry-message" aria-live="polite">
-          <div class="user-bubble">
+          <div id="resentUserBubble" class="user-bubble">
             清空所有会话
           </div>
         </div>
@@ -920,6 +946,16 @@
             <span>▻_</span>
             <span class="tool-title">步骤*1</span>
             <span class="tool-path">正在重新发送...</span>
+            <span>⌄</span>
+          </div>
+        </div>
+
+        <div id="newSessionMessage" class="message retry-message" aria-live="polite">
+          <p class="assistant-text">已创建新会话，并带入刚才未完成的问题。</p>
+          <div class="tool-pill">
+            <span>▻_</span>
+            <span class="tool-title">新会话</span>
+            <span class="tool-path">清空所有会话</span>
             <span>⌄</span>
           </div>
         </div>
@@ -974,6 +1010,8 @@
     <button class="js-demo" data-demo-state="retrying">重试中</button>
     <button class="js-demo" data-demo-state="success">重试成功</button>
     <button class="js-demo" data-demo-state="failure">重试失败</button>
+    <button class="js-demo" data-demo-state="contextLong">上下文过长</button>
+    <button class="js-demo" data-demo-state="sessionCreated">已创建会话</button>
     <button class="js-support">联系客服</button>
   </div>
 
@@ -1034,11 +1072,16 @@
     const errorMeta = document.getElementById('errorMeta');
     const errorActions = document.querySelector('.error-actions');
     const retryButton = document.getElementById('retryButton');
+    const createSessionButton = document.getElementById('createSessionButton');
     const supportButton = document.getElementById('supportButton');
     const resentUserMessage = document.getElementById('resentUserMessage');
+    const resentUserBubble = document.getElementById('resentUserBubble');
     const retryAssistantMessage = document.getElementById('retryAssistantMessage');
     const retryAssistantText = document.getElementById('retryAssistantText');
     const retryToolPill = document.getElementById('retryToolPill');
+    const newSessionMessage = document.getElementById('newSessionMessage');
+    const newConversationItem = document.getElementById('newConversationItem');
+    const taskTitle = document.getElementById('taskTitle');
     const wechatId = document.getElementById('wechatId').textContent.trim();
     const demoButtons = Array.from(document.querySelectorAll('.js-demo'));
     let retryCount = 0;
@@ -1059,6 +1102,7 @@
     function setActionDisabled(disabled) {
       retryButton.disabled = disabled;
       supportButton.disabled = disabled;
+      createSessionButton.disabled = disabled;
       retryButton.textContent = disabled ? '重试中' : '重试';
     }
 
@@ -1066,13 +1110,30 @@
       errorActions.classList.toggle('is-hidden', !visible);
     }
 
+    function setActionMode(mode) {
+      retryButton.classList.toggle('is-hidden', mode !== 'retry');
+      createSessionButton.classList.toggle('is-hidden', mode !== 'create');
+      supportButton.classList.remove('is-hidden');
+    }
+
     function showRetryMessages() {
       resentUserMessage.classList.add('show');
       retryAssistantMessage.classList.add('show');
     }
 
+    function resetConversationView() {
+      document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('active'));
+      document.querySelector('.conversation-list .conversation-item').classList.add('active');
+      newConversationItem.classList.add('is-hidden');
+      taskTitle.textContent = '清空所有会话';
+      resentUserBubble.textContent = '清空所有会话';
+      errorCard.classList.remove('session-created');
+      newSessionMessage.classList.remove('show');
+    }
+
     function setInitialFailure() {
       window.clearTimeout(retryTimer);
+      resetConversationView();
       errorCard.classList.remove('retrying', 'success');
       errorIcon.textContent = '!';
       errorTitle.textContent = '当前请求失败，请重试。若仍无法解决，请联系客服处理。';
@@ -1082,6 +1143,7 @@
       resentUserMessage.classList.remove('show');
       retryAssistantMessage.classList.remove('show');
       setActionsVisible(true);
+      setActionMode('retry');
       setActionDisabled(false);
       setDemoActive('initial');
     }
@@ -1096,6 +1158,7 @@
       retryToolPill.innerHTML = toolHtml.retrying;
       showRetryMessages();
       setActionsVisible(false);
+      setActionMode('retry');
       setActionDisabled(true);
       setDemoActive('retrying');
       if (scrollToMessage) {
@@ -1113,6 +1176,7 @@
       retryToolPill.innerHTML = toolHtml.success;
       showRetryMessages();
       setActionsVisible(false);
+      setActionMode('retry');
       setActionDisabled(false);
       setDemoActive('success');
     }
@@ -1126,8 +1190,49 @@
       retryToolPill.innerHTML = toolHtml.failure;
       showRetryMessages();
       setActionsVisible(true);
+      setActionMode('retry');
       setActionDisabled(false);
       setDemoActive('failure');
+    }
+
+    function setContextLong() {
+      window.clearTimeout(retryTimer);
+      resetConversationView();
+      errorCard.classList.remove('retrying', 'success', 'session-created');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前会话内容较长，已超过本次请求可处理范围。';
+      errorMeta.textContent = '建议创建新会话后继续处理 · request id: 20260707103005981234ctxLong';
+      retryAssistantText.textContent = '这个问题继续重试也可能再次失败，建议创建新会话后继续。';
+      retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">上下文</span><span class="tool-path">当前会话内容较长</span><span>⌄</span>';
+      resentUserMessage.classList.remove('show');
+      retryAssistantMessage.classList.add('show');
+      newSessionMessage.classList.remove('show');
+      setActionsVisible(true);
+      setActionMode('create');
+      setActionDisabled(false);
+      setDemoActive('contextLong');
+    }
+
+    function createSessionFromContext() {
+      errorCard.classList.remove('retrying', 'success');
+      errorCard.classList.add('session-created');
+      errorIcon.textContent = '';
+      errorTitle.textContent = '已创建新会话';
+      errorMeta.textContent = '已带入上一条失败问题，可在新会话继续处理';
+      document.querySelectorAll('.conversation-item').forEach((item) => item.classList.remove('active'));
+      newConversationItem.classList.remove('is-hidden');
+      newConversationItem.classList.add('active');
+      taskTitle.textContent = '清空所有会话（新会话）';
+      resentUserBubble.textContent = '清空所有会话';
+      resentUserMessage.classList.add('show');
+      retryAssistantMessage.classList.remove('show');
+      newSessionMessage.classList.add('show');
+      setActionsVisible(false);
+      setActionMode('create');
+      setActionDisabled(false);
+      setDemoActive('sessionCreated');
+      newSessionMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showToast('已创建新会话');
     }
 
     function openSupport() {
@@ -1214,6 +1319,8 @@
       });
     });
 
+    createSessionButton.addEventListener('click', createSessionFromContext);
+
     demoButtons.forEach((button) => {
       button.addEventListener('click', () => {
         const state = button.dataset.demoState;
@@ -1221,6 +1328,11 @@
         if (state === 'retrying') setRetrying(true);
         if (state === 'success') setRetrySuccess();
         if (state === 'failure') setRetryFailure();
+        if (state === 'contextLong') setContextLong();
+        if (state === 'sessionCreated') {
+          setContextLong();
+          createSessionFromContext();
+        }
       });
     });
 
