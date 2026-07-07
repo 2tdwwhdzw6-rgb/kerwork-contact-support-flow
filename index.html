@@ -549,6 +549,45 @@
       font-weight: 650;
     }
 
+    .demo-controls {
+      position: fixed;
+      left: 50%;
+      bottom: 154px;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(216, 221, 230, .86);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: 0 12px 34px rgba(20, 28, 40, .08);
+      backdrop-filter: blur(10px);
+    }
+
+    .demo-controls button {
+      height: 36px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #596273;
+      padding: 0 12px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .demo-controls button:hover {
+      background: #f3f5f8;
+      color: #171a1f;
+    }
+
+    .demo-controls button.active {
+      background: #171a1f;
+      color: #fff;
+    }
+
     .overlay {
       position: fixed;
       inset: 0;
@@ -741,6 +780,15 @@
         bottom: 136px;
       }
 
+      .demo-controls {
+        left: 18px;
+        right: 18px;
+        bottom: 198px;
+        transform: none;
+        overflow-x: auto;
+        justify-content: flex-start;
+      }
+
       .overlay {
         align-items: flex-end;
         padding: 0;
@@ -918,6 +966,14 @@
     客服
   </button>
 
+  <div class="demo-controls" aria-label="原型演示控制">
+    <button class="js-demo active" data-demo-state="initial">初始失败</button>
+    <button class="js-demo" data-demo-state="retrying">重试中</button>
+    <button class="js-demo" data-demo-state="success">重试成功</button>
+    <button class="js-demo" data-demo-state="failure">重试失败</button>
+    <button class="js-support">联系客服</button>
+  </div>
+
   <div id="supportOverlay" class="overlay" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="supportTitle">
       <div class="modal-head">
@@ -980,7 +1036,86 @@
     const retryAssistantText = document.getElementById('retryAssistantText');
     const retryToolPill = document.getElementById('retryToolPill');
     const wechatId = document.getElementById('wechatId').textContent.trim();
+    const demoButtons = Array.from(document.querySelectorAll('.js-demo'));
     let retryCount = 0;
+    let retryTimer;
+
+    const toolHtml = {
+      retrying: '<span>▻_</span><span class="tool-title">步骤*1</span><span class="tool-path">正在重新发送...</span><span>⌄</span>',
+      success: '<span>▻_</span><span class="tool-title">步骤*4</span><span class="tool-path">已执行命令 ls /Users/dyh/Library...</span><span>⌄</span>',
+      failure: '<span>▻_</span><span class="tool-title">步骤*1</span><span class="tool-path">请求失败</span><span>⌄</span>'
+    };
+
+    function setDemoActive(state) {
+      demoButtons.forEach((button) => {
+        button.classList.toggle('active', button.dataset.demoState === state);
+      });
+    }
+
+    function setActionDisabled(disabled) {
+      retryButton.disabled = disabled;
+      supportButton.disabled = disabled;
+      retryButton.textContent = disabled ? '重试中' : '重试';
+    }
+
+    function showRetryMessages() {
+      resentUserMessage.classList.add('show');
+      retryAssistantMessage.classList.add('show');
+    }
+
+    function setInitialFailure() {
+      window.clearTimeout(retryTimer);
+      errorCard.classList.remove('retrying', 'success');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前请求失败，请重试。若仍无法解决，请联系客服处理。';
+      errorMeta.textContent = 'request id: 2026070609200461331629duF5MwaE · ERR_20244';
+      retryAssistantText.textContent = '我再试一次。';
+      retryToolPill.innerHTML = toolHtml.retrying;
+      resentUserMessage.classList.remove('show');
+      retryAssistantMessage.classList.remove('show');
+      setActionDisabled(false);
+      setDemoActive('initial');
+    }
+
+    function setRetrying(scrollToMessage = false) {
+      errorCard.classList.remove('success');
+      errorCard.classList.add('retrying');
+      errorIcon.textContent = '';
+      errorTitle.textContent = '正在重新发送';
+      errorMeta.textContent = '将使用原消息内容和上下文重新发起请求';
+      retryAssistantText.textContent = '我再试一次。';
+      retryToolPill.innerHTML = toolHtml.retrying;
+      showRetryMessages();
+      setActionDisabled(true);
+      setDemoActive('retrying');
+      if (scrollToMessage) {
+        resentUserMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function setRetrySuccess() {
+      errorCard.classList.remove('retrying');
+      errorCard.classList.add('success');
+      errorTitle.textContent = '已重新发送';
+      errorMeta.textContent = '请求已恢复处理';
+      retryAssistantText.textContent = '已重新处理完成。';
+      retryToolPill.innerHTML = toolHtml.success;
+      showRetryMessages();
+      setActionDisabled(false);
+      setDemoActive('success');
+    }
+
+    function setRetryFailure() {
+      errorCard.classList.remove('retrying', 'success');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前请求仍失败，请重试或联系客服处理';
+      errorMeta.textContent = 'request id: 20260706092411823765009xRetry · ERR_20244';
+      retryAssistantText.textContent = '还是没有成功，可以再重试一次，或联系客服处理。';
+      retryToolPill.innerHTML = toolHtml.failure;
+      showRetryMessages();
+      setActionDisabled(false);
+      setDemoActive('failure');
+    }
 
     function openSupport() {
       overlay.classList.add('show');
@@ -1048,46 +1183,31 @@
     document.querySelectorAll('.js-retry').forEach((button) => {
       button.addEventListener('click', () => {
         retryCount += 1;
-        errorCard.classList.remove('success');
-        errorCard.classList.add('retrying');
-        errorIcon.textContent = '';
-        errorTitle.textContent = '正在重新发送';
-        errorMeta.textContent = '请稍候...';
-        retryButton.disabled = true;
-        supportButton.disabled = true;
-        retryButton.textContent = '重试中';
-        resentUserMessage.classList.add('show');
-        retryAssistantMessage.classList.add('show');
-        retryAssistantText.textContent = '我再试一次。';
-        retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">步骤*1</span><span class="tool-path">正在重新发送...</span><span>⌄</span>';
-        resentUserMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setRetrying(true);
         showToast('正在重新发送');
 
-        window.clearTimeout(window.retryTimer);
-        window.retryTimer = window.setTimeout(() => {
+        window.clearTimeout(retryTimer);
+        retryTimer = window.setTimeout(() => {
           const shouldSucceed = retryCount % 2 === 1;
-          retryButton.disabled = false;
-          supportButton.disabled = false;
-          retryButton.textContent = '重试';
 
           if (shouldSucceed) {
-            errorCard.classList.remove('retrying');
-            errorCard.classList.add('success');
-            errorTitle.textContent = '已重新发送';
-            errorMeta.textContent = '请求已恢复处理';
-            retryAssistantText.textContent = '已重新处理完成。';
-            retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">步骤*4</span><span class="tool-path">已执行命令 ls \\'/Users/dyh/Library...\\'</span><span>⌄</span>';
+            setRetrySuccess();
             showToast('重试成功');
           } else {
-            errorCard.classList.remove('retrying', 'success');
-            errorIcon.textContent = '!';
-            errorTitle.textContent = '当前请求仍失败，请重试或联系客服处理';
-            errorMeta.textContent = 'request id: 20260706092411823765009xRetry · ERR_20244';
-            retryAssistantText.textContent = '还是没有成功，可以再重试一次，或联系客服处理。';
-            retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">步骤*1</span><span class="tool-path">请求失败</span><span>⌄</span>';
+            setRetryFailure();
             showToast('重试失败');
           }
         }, 1300);
+      });
+    });
+
+    demoButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const state = button.dataset.demoState;
+        if (state === 'initial') setInitialFailure();
+        if (state === 'retrying') setRetrying(true);
+        if (state === 'success') setRetrySuccess();
+        if (state === 'failure') setRetryFailure();
       });
     });
 
