@@ -330,6 +330,12 @@
       border-color: #bde8ca;
     }
 
+    .error-card.notice {
+      color: #8a5b10;
+      background: #fff6df;
+      border-color: #f1d08a;
+    }
+
     .error-icon {
       width: 26px;
       height: 26px;
@@ -390,7 +396,8 @@
     }
 
     .error-card.retrying .error-meta,
-    .error-card.success .error-meta {
+    .error-card.success .error-meta,
+    .error-card.notice .error-meta {
       color: #737b89;
     }
 
@@ -411,6 +418,16 @@
     }
 
     .btn-create:hover {
+      background: #30343d;
+    }
+
+    .btn-adjust {
+      background: var(--brand);
+      color: #fff;
+      font-size: 21px;
+    }
+
+    .btn-adjust:hover {
       background: #30343d;
     }
 
@@ -930,6 +947,7 @@
             <div class="error-actions">
               <button id="retryButton" class="btn btn-primary js-retry">重试</button>
               <button id="createSessionButton" class="btn btn-create is-hidden">创建新会话</button>
+              <button id="adjustInputButton" class="btn btn-adjust is-hidden">修改后重新发送</button>
               <button id="supportButton" class="btn btn-secondary js-support">
                 <svg class="inline-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M5 18.5V19l3.2-1.7c1.1.5 2.4.7 3.8.7 4.4 0 8-2.7 8-6s-3.6-6-8-6-8 2.7-8 6c0 1.6.8 3 2.1 4.1L5 18.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -964,6 +982,12 @@
             <span class="tool-title">新会话</span>
             <span class="tool-path">清空所有会话</span>
             <span>⌄</span>
+          </div>
+        </div>
+
+        <div id="adjustInputMessage" class="message user retry-message" aria-live="polite">
+          <div class="user-bubble">
+            删除历史会话，只保留当前会话
           </div>
         </div>
 
@@ -1019,6 +1043,9 @@
     <button class="js-demo" data-demo-state="failure">重试失败</button>
     <button class="js-demo" data-demo-state="contextLong">上下文过长</button>
     <button class="js-demo" data-demo-state="sessionCreated">已创建会话</button>
+    <button class="js-demo" data-demo-state="adjustInput">调整输入</button>
+    <button class="js-demo" data-demo-state="quota">额度不足</button>
+    <button class="js-demo" data-demo-state="manual">人工处理</button>
     <button class="js-support">联系客服</button>
   </div>
 
@@ -1053,6 +1080,7 @@
     const errorActions = document.querySelector('.error-actions');
     const retryButton = document.getElementById('retryButton');
     const createSessionButton = document.getElementById('createSessionButton');
+    const adjustInputButton = document.getElementById('adjustInputButton');
     const supportButton = document.getElementById('supportButton');
     const resentUserMessage = document.getElementById('resentUserMessage');
     const resentUserBubble = document.getElementById('resentUserBubble');
@@ -1060,6 +1088,7 @@
     const retryAssistantText = document.getElementById('retryAssistantText');
     const retryToolPill = document.getElementById('retryToolPill');
     const newSessionMessage = document.getElementById('newSessionMessage');
+    const adjustInputMessage = document.getElementById('adjustInputMessage');
     const newConversationItem = document.getElementById('newConversationItem');
     const taskTitle = document.getElementById('taskTitle');
     const demoButtons = Array.from(document.querySelectorAll('.js-demo'));
@@ -1082,6 +1111,7 @@
       retryButton.disabled = disabled;
       supportButton.disabled = disabled;
       createSessionButton.disabled = disabled;
+      adjustInputButton.disabled = disabled;
       retryButton.textContent = disabled ? '重试中' : '重试';
     }
 
@@ -1092,7 +1122,8 @@
     function setActionMode(mode) {
       retryButton.classList.toggle('is-hidden', mode !== 'retry');
       createSessionButton.classList.toggle('is-hidden', mode !== 'create');
-      supportButton.classList.remove('is-hidden');
+      adjustInputButton.classList.toggle('is-hidden', mode !== 'adjust');
+      supportButton.classList.toggle('is-hidden', mode === 'none');
     }
 
     function showRetryMessages() {
@@ -1106,14 +1137,15 @@
       newConversationItem.classList.add('is-hidden');
       taskTitle.textContent = '清空所有会话';
       resentUserBubble.textContent = '清空所有会话';
-      errorCard.classList.remove('session-created');
+      errorCard.classList.remove('notice', 'session-created');
       newSessionMessage.classList.remove('show');
+      adjustInputMessage.classList.remove('show');
     }
 
     function setInitialFailure() {
       window.clearTimeout(retryTimer);
       resetConversationView();
-      errorCard.classList.remove('retrying', 'success');
+      errorCard.classList.remove('retrying', 'success', 'notice', 'session-created');
       errorIcon.textContent = '!';
       errorTitle.textContent = '当前请求失败，请重试。若仍无法解决，请联系客服处理。';
       errorMeta.textContent = 'request id: 2026070609200461331629duF5MwaE · ERR_20244';
@@ -1128,7 +1160,7 @@
     }
 
     function setRetrying(scrollToMessage = false) {
-      errorCard.classList.remove('success');
+      errorCard.classList.remove('success', 'notice', 'session-created');
       errorCard.classList.add('retrying');
       errorIcon.textContent = '';
       errorTitle.textContent = '正在重新发送';
@@ -1146,7 +1178,7 @@
     }
 
     function setRetrySuccess() {
-      errorCard.classList.remove('retrying');
+      errorCard.classList.remove('retrying', 'notice', 'session-created');
       errorCard.classList.add('success');
       errorIcon.textContent = '';
       errorTitle.textContent = '已重试成功';
@@ -1161,7 +1193,7 @@
     }
 
     function setRetryFailure() {
-      errorCard.classList.remove('retrying', 'success');
+      errorCard.classList.remove('retrying', 'success', 'notice', 'session-created');
       errorIcon.textContent = '!';
       errorTitle.textContent = '当前请求仍失败，请重试或联系客服处理';
       errorMeta.textContent = 'request id: 20260706092411823765009xRetry · ERR_20244';
@@ -1214,6 +1246,72 @@
       showToast('已创建新会话');
     }
 
+    function setAdjustInput() {
+      window.clearTimeout(retryTimer);
+      resetConversationView();
+      errorCard.classList.remove('retrying', 'success', 'session-created');
+      errorCard.classList.add('notice');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前输入内容无法继续处理，请调整后重新发送。';
+      errorMeta.textContent = '可精简内容或修改敏感表达 · request id: 20260707104633009adjust';
+      retryAssistantText.textContent = '这类问题需要先修改输入内容，直接重试仍可能失败。';
+      retryToolPill.innerHTML = '<span>▻_</span><span class="tool-title">输入</span><span class="tool-path">等待用户调整内容</span><span>⌄</span>';
+      resentUserMessage.classList.remove('show');
+      retryAssistantMessage.classList.add('show');
+      newSessionMessage.classList.remove('show');
+      adjustInputMessage.classList.remove('show');
+      setActionsVisible(true);
+      setActionMode('adjust');
+      setActionDisabled(false);
+      setDemoActive('adjustInput');
+    }
+
+    function resendAdjustedInput() {
+      errorCard.classList.remove('retrying', 'notice', 'session-created');
+      errorCard.classList.add('success');
+      errorIcon.textContent = '';
+      errorTitle.textContent = '已重新发送';
+      errorMeta.textContent = '已使用修改后的内容重新提交';
+      retryAssistantMessage.classList.remove('show');
+      adjustInputMessage.classList.add('show');
+      setActionsVisible(false);
+      setActionMode('none');
+      setActionDisabled(false);
+      showToast('已重新发送');
+      adjustInputMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function setQuotaState() {
+      window.clearTimeout(retryTimer);
+      resetConversationView();
+      errorCard.classList.remove('retrying', 'success', 'session-created');
+      errorCard.classList.add('notice');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前额度已用尽，请联系客服处理。';
+      errorMeta.textContent = '充值入口暂未上线 · request id: 20260707105012831quota';
+      retryAssistantMessage.classList.remove('show');
+      resentUserMessage.classList.remove('show');
+      setActionsVisible(true);
+      setActionMode('support');
+      setActionDisabled(false);
+      setDemoActive('quota');
+    }
+
+    function setManualState() {
+      window.clearTimeout(retryTimer);
+      resetConversationView();
+      errorCard.classList.remove('retrying', 'success', 'notice', 'session-created');
+      errorIcon.textContent = '!';
+      errorTitle.textContent = '当前请求无法继续处理，请联系客服协助。';
+      errorMeta.textContent = '已保留 request id 和错误码，便于客服定位问题 · ERR_AUTH_401';
+      retryAssistantMessage.classList.remove('show');
+      resentUserMessage.classList.remove('show');
+      setActionsVisible(true);
+      setActionMode('support');
+      setActionDisabled(false);
+      setDemoActive('manual');
+    }
+
     function openSupport() {
       overlay.classList.add('show');
       overlay.setAttribute('aria-hidden', 'false');
@@ -1262,6 +1360,7 @@
     });
 
     createSessionButton.addEventListener('click', createSessionFromContext);
+    adjustInputButton.addEventListener('click', resendAdjustedInput);
 
     demoButtons.forEach((button) => {
       button.addEventListener('click', () => {
@@ -1275,6 +1374,9 @@
           setContextLong();
           createSessionFromContext();
         }
+        if (state === 'adjustInput') setAdjustInput();
+        if (state === 'quota') setQuotaState();
+        if (state === 'manual') setManualState();
       });
     });
 
